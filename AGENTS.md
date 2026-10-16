@@ -28,7 +28,7 @@
 ## 瀏覽器原則
 
 - **註冊／登入／OAuth 同意 → 系統預設瀏覽器。** 由你用指令打開：Windows `Start-Process "<網址>"`（PowerShell）或 `start "" "<網址>"`（cmd）；macOS `open "<網址>"`；Linux `xdg-open "<網址>"`。使用者通常早已在那裡登入 Google／GitHub，最穩。
-- **內建瀏覽器（Codex 內建瀏覽器、Antigravity browser agent）→ 只用來開說明頁、預覽、驗收部署好的網頁。** 內建瀏覽器是獨立的設定檔，不共用系統瀏覽器的登入狀態；Google 登入也常擋自動化瀏覽器，所以不要在裡面登入。
+- **內建瀏覽器（Codex 內建瀏覽器、Antigravity browser agent、OpenCode 桌面版 2.x 的瀏覽器窗格）→ 只用來開說明頁、預覽、驗收部署好的網頁。** 內建瀏覽器是獨立的設定檔，不共用系統瀏覽器的登入狀態；Google 登入也常擋自動化瀏覽器，所以不要在裡面登入。
 - **使用者說「我沒有帳號」**：用系統瀏覽器打開註冊頁，逐步口頭引導（「按右上角 Sign up → 選 Continue with GitHub → …」），等使用者回覆「好了」再繼續。
 
 ## 可續跑（重要）
@@ -194,8 +194,8 @@ npx -y wrangler deploy --assets=./hello --name <暱稱>-hello --compatibility-da
 
 ## 第 8 步：端到端驗收（看到「✅ 連線成功」才算完成）
 
-1. 有內建瀏覽器（Codex 內建瀏覽器、Antigravity browser agent）→ 開正式網址，確認頁面顯示「前端：Cloudflare ✅」，按「測試 Supabase」，等待結果。
-2. 沒有內建瀏覽器（例如 OpenCode、Codex CLI）→ 用系統瀏覽器開正式網址，請使用者按「測試 Supabase」並告訴你看到什麼。
+1. 有內建瀏覽器（Codex 內建瀏覽器、Antigravity browser agent、OpenCode 桌面版 2.x 的 `tools.browser.*`）→ 開正式網址，確認頁面顯示「前端：Cloudflare ✅」，按「測試 Supabase」，等待結果。
+2. 沒有內建瀏覽器（例如 OpenCode 1.x 或 TUI、Codex CLI）→ 用系統瀏覽器開正式網址，請使用者按「測試 Supabase」並告訴你看到什麼。
 3. 也可用命令列輔助驗證：`curl -I <正式網址>` 應為 200；必要時用 publishable key 對 `https://<ref>.supabase.co/rest/v1/connect_check` 做一次 POST＋GET。
 4. 頁面顯示「✅ 連線成功」→ 完成。顯示錯誤 → 依頁面上的建議處理：
    - 「設定未填」→ 回第 6 步並重新部署（第 7 步）。
