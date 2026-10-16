@@ -1,6 +1,13 @@
 # 疑難排解
 
-> 給 Agent 與老師共用。原則不變：指令由 Agent 執行，使用者只負責註冊、登入、按同意。
+> 給 Agent 與老師共用。
+
+## 執行原則
+
+- 指令一律由 Agent 執行，使用者只負責註冊 Cloudflare、在瀏覽器按 Allow、按「是／允許」。
+- 不需要、也不可以要使用者貼任何密碼、金鑰或 Token。
+- `d1 create`、`migrations apply`、`deploy` 都在 `hello/` 資料夾內執行。
+- 程序可重跑：卡住處理完後說「照 AGENTS.md 繼續」，已完成的步驟會跳過。
 
 ## Windows 環境
 
@@ -13,96 +20,70 @@
 - Agent 用系統瀏覽器開 https://nodejs.org/ ，引導使用者下載 **LTS** 的 Windows 安裝檔（.msi），一路按「下一步」。
 - 學校電腦若禁止安裝軟體：請改用自己的筆電，或請資訊組協助。
 
+### `winget` 安裝跳出 UAC 但使用者沒看到
+- UAC 視窗可能在工作列閃爍、被其他視窗蓋住。請使用者看工作列的盾牌圖示並按「是」。
+
 ### 裝好 Node.js 但還是說找不到 `node`／`npx`（PATH 未更新）
 - 已開著的終端機不會自動拿到新 PATH。Agent 在同一個 PowerShell 指令前加：
   `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User');`
 - 仍不行：請使用者完全關閉並重開 Agent（Codex／Antigravity／OpenCode），再說「照 AGENTS.md 繼續」。
 
-### `winget` 安裝跳出 UAC 但使用者沒看到
-- UAC 視窗可能在工作列閃爍、被其他視窗蓋住。請使用者看工作列的盾牌圖示並按「是」。
+### 資料夾路徑太深（只影響本機 `--local` 測試）
+- Windows 路徑上限約 260 字元；資料夾放在很深的位置時，`wrangler d1 … --local` 會出現 `internal error`。正式流程用 `--remote` 不受影響。
+- 本機測試請把資料夾放在桌面等短路徑，或加 `--persist-to <短路徑>`。
 
-## OAuth／授權
+## Cloudflare 授權（wrangler login）
 
-### 瀏覽器按了同意，但 Agent 一直等不到（回呼失敗）
-- 原因多半是防毒軟體、公司或學校代理伺服器擋住 `127.0.0.1`／`localhost` 的回呼。
-- 處理順序：① 確認瀏覽器頁面顯示成功 ② 請使用者改連**手機熱點**再重試 ③ 暫時關閉瀏覽器的廣告阻擋擴充 ④ 換用 Chrome／Edge。
-- 研習現場若整間教室都失敗，多半是網路層擋，直接全體改手機熱點最快。
+### 按了 Allow，但指令一直等不到（回呼被擋）
+- 授權完成要回呼到本機 `localhost:8976`；防毒軟體、學校或公司網路的代理伺服器常擋這個回呼。
+- 處理順序：
+  1. 確認瀏覽器頁面顯示授權成功。
+  2. 請使用者改連**手機熱點**，Agent 重跑授權（研習現場整間教室都失敗時，全體改熱點最快）。
+  3. Agent 重跑 `npx wrangler login --browser=false`，把印出的網址改在**系統瀏覽器**打開完成授權（內建瀏覽器有時回呼不到本機）。
+- Agent 的指令逾時太短也會中斷：逾時設 5 分鐘以上再跑一次。
 
-### OpenCode：`opencode mcp auth list` 顯示 expired 或未驗證
-- 重新執行 `opencode mcp auth supabase`。
-- 仍失敗：`opencode mcp debug supabase` 看是連線還是 OAuth 探索失敗；必要時 `opencode mcp logout supabase` 後再 auth 一次。
+### 內建瀏覽器登入狀態跟平常瀏覽器不同
+- 內建瀏覽器是獨立設定檔，平常瀏覽器已登入 Cloudflare，在內建瀏覽器裡還要再登入一次。請先記好密碼。
+- 內建瀏覽器擋登入時，改用系統瀏覽器完成，結果相同（Wrangler 登入是整台電腦共用）。
 
-### Codex：授權失敗或 `codex mcp list` 看不到 supabase
-- 確認 `~/.codex/config.toml` 有 `[mcp_servers.supabase]` 與 `url`；沒有就 `codex mcp add supabase --url https://mcp.supabase.com/mcp`。
-- 重新 `codex mcp login supabase`。桌面 App 可到設定 → MCP servers → Authenticate。
-- 專案層 `.codex/config.toml` 只在「受信任專案」生效；不確定就改用全域設定。
-- Codex 沙盒預設可能擋網路或寫入家目錄：Agent 會跳出權限請求，請使用者按允許。
+### Codex 沙盒擋網路
+- Agent 會跳出權限請求，請使用者按允許。
 
-### 內建瀏覽器不能登入／授權後沒反應
-- 內建瀏覽器是獨立設定檔，不共用你平常瀏覽器的登入狀態，要在裡面重新登入一次。
-- 授權後指令一直沒結束：確認授權網址是由「只印網址」的指令產生（`wrangler login --browser=false`、`codex mcp login … --no-browser`），而且那個指令還在背景等待；逾時就重跑。
-- 仍不行 → 改用系統瀏覽器：拿掉 `--browser=false`／`--no-browser` 重跑，讓它自動開平常的瀏覽器。
+## Cloudflare 帳號與部署
 
-### Antigravity：遠端 OAuth 連不上 Supabase
-- 先確認設定用的是 `serverUrl`（不是 `url`／`httpUrl`），JSON 語法正確，然後重開 Antigravity。
-- 到設定（`Ctrl+,`）→ Customizations → supabase → **Authenticate**；網頁若給授權碼，使用者自己貼回面板按 Submit。
-- 社群回報 Supabase 遠端 OAuth 曾失敗。仍不行就改 command 型橋接（需 Node.js）：
-  ```json
-  { "mcpServers": { "supabase": { "command": "npx", "args": ["-y", "mcp-remote", "https://mcp.supabase.com/mcp"] } } }
-  ```
-  Windows 若啟動失敗改：`"command": "cmd", "args": ["/c", "npx", "-y", "mcp-remote", "https://mcp.supabase.com/mcp"]`。`mcp-remote` 會開系統瀏覽器做 OAuth。
-- 設定檔位置不確定（`~/.gemini/config/` 與 `~/.gemini/antigravity/` 兩種說法）：可先寫工作區 `.agents/mcp_config.json` 讓本資料夾能用。
+### 沒收到驗證信／部署失敗要求驗證 Email
+- Cloudflare 註冊後要先點信箱裡的驗證信。請使用者檢查收件匣與**垃圾郵件**，點完再請 Agent 重試。
+- 仍沒收到：在 Cloudflare 後台上方的提示列可重寄驗證信。
 
-### Antigravity browser agent 卡在 Google 登入
-- Google 常擋自動化瀏覽器。Supabase、Cloudflare 都不需要 Google 登入：改用 GitHub、ChatGPT 或 Email 方式；真的要用 Google 帳號時改在系統瀏覽器登入。
+### 部署時說要先設定 workers.dev 子網域（新帳號第一次）
+- Agent 在內建瀏覽器開 https://dash.cloudflare.com/ （必要時改系統瀏覽器），引導使用者：左側「Workers & Pages」（或 Compute › Workers & Pages）→ 依畫面設定 workers.dev 子網域（自取英文名稱，之後所有網站都會用它）→ 回覆「好了」後 Agent 重跑 `npx -y wrangler deploy`。
 
-## Supabase
+### `wrangler.jsonc` 的 name 錯誤（`CHANGE-ME-hello`）
+- 含大寫的預設名稱會被 Wrangler 拒絕，這是防呆：Agent 要先把 name 改成 `<暱稱>-hello`（只能小寫 a-z、0-9、連字號）。
 
-### 建專案失敗：已達免費專案上限
-- 免費方案每個組織最多 **2 個啟用中**專案。
-- 選項：① 沿用既有專案（只會新增一張 `connect_check` 表）② 經使用者同意後暫停一個不用的專案（`pause_project`）③ 建立新組織（需使用者在後台操作）。
+### D1 名稱重複（already exists）
+- 帳號裡已有同名資料庫（例如之前跑過一次）。Agent 先問使用者要不要沿用：
+  - 沿用：`npx -y wrangler d1 list` 找到該名稱的 id，手動加進 `hello/wrangler.jsonc` 的 `d1_databases`（binding `DB`）。
+  - 不沿用：改名（例如 `<暱稱>-hello2-db`）重新建立。
 
-### 專案暫停了（閒置約 7 天）
-- 對 Agent 說「恢復我的 Supabase 專案」：Agent 用 `restore_project`，等狀態回到 `ACTIVE_HEALTHY`（約數分鐘）。
-- 也可由使用者在 Supabase 後台該專案頁按 **Restore**。
+### 測試網頁顯示「找不到資料表」（忘記 migrations）
+- 代表雲端資料庫還沒建立 `connect_check`。Agent 在 `hello/` 內執行：
+  `npx -y wrangler d1 migrations apply <暱稱>-hello-db --remote`
+- 不必重新部署。注意要加 `--remote`，`--local` 只會改本機測試資料庫。
 
-### 測試網頁顯示「找不到資料表」「權限被拒（RLS）」
-- 找不到資料表：Agent 重做 AGENTS.md 第 5 步。
-- 權限被拒：重新套用 `supabase/migrations/20261017000000_connect_check.sql`（含 grant 與 policy，可重複執行）。
+### 測試網頁顯示「網站還沒接上 D1 資料庫」
+- `wrangler.jsonc` 沒有 `d1_databases`，或部署時不是在 `hello/` 內執行。Agent 補做第 4 步後重新 `npx -y wrangler deploy`。
 
-### `get_cost` 顯示非 0
-- 代表該組織不在免費方案或已有付費資源。Agent 必須停下來問使用者；不同意就沿用既有專案。
-
-## Cloudflare
-
-### 部署失敗、要求驗證 Email
-- Cloudflare 註冊後要先點信箱裡的驗證信。請使用者檢查收件匣與垃圾郵件，點完再請 Agent 重試部署。
-
-### `wrangler login` 一直等不到／回呼失敗
-- 同上「回呼失敗」處理（手機熱點最快）。
-- Agent 的指令逾時太短也會中斷：把逾時設 5 分鐘以上再跑一次。
+### 免費額度用完
+- Workers 與 D1 免費方案有每日用量上限，**每天 UTC 0 點（台灣早上 8 點）重置**。研習測試幾乎不可能用完；真的出現就隔天再試，不需要升級付費。
 
 ### 網址打不開（剛部署完）
 - 新的 `*.workers.dev` 網址可能要 1～2 分鐘才生效，稍後再開。
-- 正式網址以 `wrangler deploy` 輸出最後一行為準，格式 `https://<名稱>.<帳號子網域>.workers.dev`。
+- 正式網址以 `wrangler deploy` 輸出為準，格式 `https://<名稱>.<帳號子網域>.workers.dev`。
 
-### 部署時說要先設定 workers.dev 子網域（新帳號第一次）
-- Agent 在內建瀏覽器開 https://dash.cloudflare.com/ （必要時改系統瀏覽器），引導使用者：左側「Workers & Pages」→ 依畫面設定 workers.dev 子網域（自取英文名稱，之後所有網站都會用它）→ 回覆「好了」後 Agent 重跑部署。
-
-### `wrangler pages project create`／`pages deploy` 失敗
-- Cloudflare Pages 已併入 Workers，新版 Wrangler 會把它轉成 `wrangler deploy` 而失敗。改用：
-  `npx -y wrangler deploy --assets=./hello --name <暱稱>-hello --compatibility-date 2026-10-01`
-- 名稱只能小寫 a-z、0-9、連字號。
+### `wrangler pages …` 指令失敗
+- Cloudflare Pages 已併入 Workers。本包一律在 `hello/` 內用 `npx -y wrangler deploy`。
 
 ## 同時使用多個 Agent
 
-各平台的 MCP 設定與授權**互相獨立**，在 A 平台授權過，B 平台還要再授權一次。Wrangler 登入則是整台電腦共用（同一個使用者帳號）。
-
-| 平台 | 設定檔 | 授權方式 |
-|---|---|---|
-| Codex | `~/.codex/config.toml`（App、CLI、IDE 共用） | `codex mcp login supabase` |
-| Antigravity | `~/.gemini/config/mcp_config.json`（或 `~/.gemini/antigravity/mcp_config.json`）、`.agents/mcp_config.json` | Customizations → Authenticate |
-| OpenCode | `~/.config/opencode/opencode.json(c)`、專案 `opencode.json` | `opencode mcp auth supabase` |
-| Cloudflare（共用） | Wrangler 本機登入 | `npx -y wrangler login` |
-
-`scripts/check.ps1`／`check.sh` 的 `mcp` 區塊會分別列出三個平台是否已設定 Supabase。
+Wrangler 登入是整台電腦（同一個 Windows 使用者）共用，在 A 平台授權過，B 平台不必再授權。第 1 步檢查會看到 `wrangler.status=logged_in` 並自動跳過。

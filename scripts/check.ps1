@@ -4,7 +4,7 @@
   Run by the Agent (not the user):
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check.ps1
   - Installs nothing, changes nothing.
-  - Never prints tokens, keys or config file contents (only "configured: true/false").
+  - Never prints tokens, keys or config file contents (only true/false and names).
   - Output: one JSON object on stdout.
 #>
 param([int]$TimeoutSec = 30)
@@ -13,8 +13,6 @@ $ErrorActionPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$UserHome = $env:USERPROFILE
-if (-not $UserHome) { $UserHome = $HOME }
 
 function Get-CmdPath([string]$Name) {
   $c = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -70,19 +68,6 @@ function Get-Version([string]$Name, [string]$VerArgs = '--version') {
   return [ordered]@{ ok = ($r.exitCode -eq 0); version = $first; path = $path }
 }
 
-# Check a config file without printing its content.
-function Test-ConfigFile([string]$Path, [string]$Needle, [switch]$Json) {
-  $info = [ordered]@{ path = $Path; exists = $false; hasSupabase = $false; validJson = $null }
-  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $info }
-  $info.exists = $true
-  $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-  if ($raw -and $raw.Contains($Needle)) { $info.hasSupabase = $true }
-  if ($Json) {
-    try { $null = $raw | ConvertFrom-Json -ErrorAction Stop; $info.validJson = $true } catch { $info.validJson = $false }
-  }
-  return $info
-}
-
 $result = [ordered]@{}
 $result.tool = 'agent-connect-lazy-pack/check.ps1'
 $result.time = (Get-Date).ToString('s')
@@ -116,84 +101,33 @@ if ($result.npx.ok) {
 } else { $wr.note = 'npx missing (install Node.js LTS first)' }
 $result.wrangler = $wr
 
-# 4. MCP configuration per platform (contents never printed)
-function First-Existing([string[]]$Paths) {
-  foreach ($p in $Paths) { if (Test-Path -LiteralPath $p -PathType Leaf) { return $p } }
-  return $Paths[0]
+# 4. hello/ project state (no secrets involved; database_id is not printed)
+$hello = [ordered]@{
+  wranglerJsonc = $false; name = $null; nameChanged = $false; hasD1 = $false; d1DatabaseName = $null
+  workerJs = (Test-Path -LiteralPath (Join-Path $RepoRoot 'hello\worker.js'))
+  indexHtml = (Test-Path -LiteralPath (Join-Path $RepoRoot 'hello\public\index.html'))
+  migration = (Test-Path -LiteralPath (Join-Path $RepoRoot 'hello\migrations\0001_connect_check.sql'))
 }
-$mcp = [ordered]@{}
-
-# OpenCode: opencode.json or opencode.jsonc (jsonc is not checked for JSON validity)
-$ocGlobal  = First-Existing @((Join-Path $UserHome '.config\opencode\opencode.json'), (Join-Path $UserHome '.config\opencode\opencode.jsonc'), (Join-Path $UserHome '.config\opencode\config.json'))
-$ocProject = First-Existing @((Join-Path $RepoRoot 'opencode.json'), (Join-Path $RepoRoot 'opencode.jsonc'))
-$oc = [ordered]@{
-  globalConfig  = $(if ($ocGlobal -like '*.jsonc') { Test-ConfigFile $ocGlobal 'mcp.supabase.com' } else { Test-ConfigFile $ocGlobal 'mcp.supabase.com' -Json })
-  projectConfig = $(if ($ocProject -like '*.jsonc') { Test-ConfigFile $ocProject 'mcp.supabase.com' } else { Test-ConfigFile $ocProject 'mcp.supabase.com' -Json })
-  supabaseLine = $null
-  mcpList = $null
-}
-if ($result.platforms.opencode.cli) {
-  $oc.mcpList = Invoke-Capture 'opencode mcp list' $TimeoutSec
-  $line = ($oc.mcpList.output -split "`n" | Where-Object { $_ -match '(?i)\bsupabase\b' } | Select-Object -First 1)
-  if ($line) { $oc.supabaseLine = ($line -replace '^[^A-Za-z0-9]+', '').Trim() }
-}
-$oc.supabaseConfigured = [bool]($oc.globalConfig.hasSupabase -or $oc.projectConfig.hasSupabase -or $oc.supabaseLine)
-$mcp.opencode = $oc
-
-# Codex: config.toml (App, CLI and IDE share it); server list via --json (env values never printed)
-$cx = [ordered]@{
-  globalConfig  = Test-ConfigFile (Join-Path $UserHome '.codex\config.toml') '[mcp_servers.supabase]'
-  projectConfig = Test-ConfigFile (Join-Path $RepoRoot '.codex\config.toml') '[mcp_servers.supabase]'
-  servers = $null
-}
-if ($result.platforms.codex.cli) {
-  $r = Invoke-Capture 'codex mcp list --json' $TimeoutSec -StdoutOnly
-  try {
-    $list = $r.output | ConvertFrom-Json -ErrorAction Stop
-    $cx.servers = @($list | ForEach-Object {
-      [ordered]@{ name = $_.name; enabled = $_.enabled; transport = $_.transport.type; url = $_.transport.url; auth = $_.auth_status }
-    })
-  } catch { $cx.servers = 'unparsed: ' + (Clean-Text $r.output 300) }
-}
-$cx.supabaseConfigured = [bool]($cx.globalConfig.hasSupabase -or $cx.projectConfig.hasSupabase -or (@($cx.servers) | Where-Object { $_.name -eq 'supabase' }))
-$mcp.codex = $cx
-
-# Antigravity: global path per Antigravity docs, legacy path per Supabase docs, workspace file
-$ag = [ordered]@{
-  globalConfig       = Test-ConfigFile (Join-Path $UserHome '.gemini\config\mcp_config.json') 'supabase' -Json
-  globalConfigLegacy = Test-ConfigFile (Join-Path $UserHome '.gemini\antigravity\mcp_config.json') 'supabase' -Json
-  workspaceConfig    = Test-ConfigFile (Join-Path $RepoRoot '.agents\mcp_config.json') 'supabase' -Json
-  note = 'OAuth state is only visible in Antigravity: Settings > Customizations'
-}
-$ag.supabaseConfigured = [bool]($ag.globalConfig.hasSupabase -or $ag.globalConfigLegacy.hasSupabase -or $ag.workspaceConfig.hasSupabase)
-$mcp.antigravity = $ag
-$result.mcp = $mcp
-
-# 5. Repo files (key value never printed, only its kind)
-$hello = [ordered]@{ indexHtml = (Test-Path (Join-Path $RepoRoot 'hello\index.html')); configFilled = $false; urlFilled = $false; keyKind = 'empty' }
-$cfgPath = Join-Path $RepoRoot 'hello\config.js'
-if (Test-Path $cfgPath) {
-  $cfg = Get-Content -LiteralPath $cfgPath -Raw -Encoding UTF8
-  if ($cfg -match 'supabaseUrl\s*:\s*"(https://[^"]+)"') { $hello.urlFilled = $true }
-  if ($cfg -match 'supabaseKey\s*:\s*"([^"]+)"') {
-    $k = $Matches[1]
-    if ($k -like 'sb_publishable_*') { $hello.keyKind = 'publishable' }
-    elseif ($k -like 'sb_secret_*') { $hello.keyKind = 'SECRET_DANGER' }
-    elseif ($k -like 'eyJ*') { $hello.keyKind = 'legacy_jwt' }
-    else { $hello.keyKind = 'other' }
+$wjPath = Join-Path $RepoRoot 'hello\wrangler.jsonc'
+if (Test-Path -LiteralPath $wjPath -PathType Leaf) {
+  $hello.wranglerJsonc = $true
+  $wj = Get-Content -LiteralPath $wjPath -Raw -Encoding UTF8
+  if ($wj -match '"name"\s*:\s*"([^"]*)"') { $hello.name = $Matches[1] }
+  $hello.nameChanged = [bool]($hello.name -and $hello.name -ne 'CHANGE-ME-hello')
+  if ($wj -match '"d1_databases"') {
+    $hello.hasD1 = $true
+    if ($wj -match '"database_name"\s*:\s*"([^"]*)"') { $hello.d1DatabaseName = $Matches[1] }
   }
-  $hello.configFilled = ($hello.urlFilled -and ($hello.keyKind -in @('publishable', 'legacy_jwt')))
 }
 $result.hello = $hello
-$result.migration = (Test-Path (Join-Path $RepoRoot 'supabase\migrations\20261017000000_connect_check.sql'))
 
-# 6. Hints for the Agent
+# 5. Hints for the Agent
 $hints = @()
 if (-not $result.node.ok) { $hints += 'Node.js missing: winget install -e --id OpenJS.NodeJS.LTS (user approves UAC), then refresh PATH.' }
-if ($wr.status -ne 'logged_in') { $hints += 'Cloudflare: run npx -y wrangler login (AGENTS.md step 3).' }
-$hints += ("Supabase MCP configured: opencode=" + $oc.supabaseConfigured + ", codex=" + $cx.supabaseConfigured + ", antigravity=" + $ag.supabaseConfigured + ". Only the platform you are running on matters (AGENTS.md step 2).")
-if ($hello.keyKind -eq 'SECRET_DANGER') { $hints += 'DANGER: hello/config.js contains a secret key. Replace with publishable key immediately.' }
-elseif (-not $hello.configFilled) { $hints += 'hello/config.js not filled yet (AGENTS.md step 6).' }
+if ($wr.status -ne 'logged_in') { $hints += 'Cloudflare: AGENTS.md steps 2-3 (npx -y wrangler login --browser=false, open URL in built-in browser).' }
+if (-not $hello.nameChanged) { $hints += 'hello/wrangler.jsonc name is still CHANGE-ME-hello: set it to <nickname>-hello first (AGENTS.md step 4).' }
+if (-not $hello.hasD1) { $hints += 'No d1_databases yet: in hello/ run npx -y wrangler d1 create <nickname>-hello-db --binding DB --update-config (AGENTS.md step 4).' }
+else { $hints += 'D1 configured; next: migrations apply --remote (step 5), deploy (step 6), verify (step 7).' }
 $result.hints = $hints
 
 $result | ConvertTo-Json -Depth 6

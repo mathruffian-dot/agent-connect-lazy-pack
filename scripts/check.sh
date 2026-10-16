@@ -2,7 +2,7 @@
 # agent-connect-lazy-pack : read-only environment check (macOS / Linux / Git Bash)
 # Run by the Agent (not the user):  bash scripts/check.sh
 # - Installs nothing, changes nothing.
-# - Never prints tokens, keys or config file contents (only true/false).
+# - Never prints tokens, keys or config file contents (only true/false and names).
 # - Output: one JSON object on stdout.
 set -u
 
@@ -33,18 +33,13 @@ run() {
 
 ver() { if has "$1"; then run "$@" | head -n 1; fi; }
 
-# file_check <path> <needle> -> {"path":..,"exists":..,"hasSupabase":..}
-file_check() {
-  local p="$1" n="$2" e=false h=false
-  if [ -f "$p" ]; then e=true; if grep -qF -- "$n" "$p" 2>/dev/null; then h=true; fi; fi
-  printf '{"path":%s,"exists":%s,"hasSupabase":%s}' "$(js "$p")" "$e" "$h"
-}
-first_existing() { for p in "$@"; do [ -f "$p" ] && { echo "$p"; return; }; done; echo "$1"; }
-
 OS="$(uname -s 2>/dev/null || echo unknown)"
 NODE_V="$(ver node -v)"; NPM_V="$(ver npm -v)"; NPX_V="$(ver npx -v)"; GIT_V="$(ver git --version)"
 
-# Wrangler (no download)
+# Agent platform CLIs (desktop apps may not add a CLI to PATH)
+AG_CLI=""; has agy && AG_CLI="$(command -v agy)"; [ -z "$AG_CLI" ] && has antigravity && AG_CLI="$(command -v antigravity)"
+
+# Wrangler login state (no download: --no-install)
 WR_STATUS=unknown; WR_NOTE=""
 if has npx; then
   WR_OUT="$(run npx --no-install wrangler whoami)"
@@ -53,52 +48,25 @@ if has npx; then
   else WR_NOTE="wrangler not cached locally; Agent will run: npx -y wrangler login"; fi
 else WR_NOTE="npx missing (install Node.js LTS first)"; fi
 
-# OpenCode
-OC_G="$(first_existing "$HOME/.config/opencode/opencode.json" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.config/opencode/config.json")"
-OC_P="$(first_existing "$REPO_ROOT/opencode.json" "$REPO_ROOT/opencode.jsonc")"
-OC_LINE=""
-if has opencode; then OC_LINE="$(run opencode mcp list | grep -iw supabase | head -n 1 | sed 's/^[^A-Za-z0-9]*//')"; fi
-OC_CFG=false
-{ grep -qF mcp.supabase.com "$OC_G" 2>/dev/null || grep -qF mcp.supabase.com "$OC_P" 2>/dev/null || [ -n "$OC_LINE" ]; } && OC_CFG=true
-
-# Codex (config shared by app / CLI / IDE)
-CX_G="$HOME/.codex/config.toml"; CX_P="$REPO_ROOT/.codex/config.toml"
-CX_NAMES=""
-if has codex; then
-  CX_NAMES="$(RUN_LIMIT=10000000 run codex mcp list --json | grep -oE '"name": *"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/' | tr '\n' ',' | sed 's/,$//')"
+# hello/ project state (database_id is never printed)
+WJ="$REPO_ROOT/hello/wrangler.jsonc"
+WJ_EXISTS=false; NAME=""; NAME_CHANGED=false; HAS_D1=false; D1_NAME=""
+if [ -f "$WJ" ]; then
+  WJ_EXISTS=true
+  NAME="$(sed -nE 's/.*"name"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$WJ" | head -n 1)"
+  if [ -n "$NAME" ] && [ "$NAME" != "CHANGE-ME-hello" ]; then NAME_CHANGED=true; fi
+  if grep -qF '"d1_databases"' "$WJ"; then
+    HAS_D1=true
+    D1_NAME="$(sed -nE 's/.*"database_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$WJ" | head -n 1)"
+  fi
 fi
-CX_CFG=false
-{ grep -qF '[mcp_servers.supabase]' "$CX_G" 2>/dev/null || grep -qF '[mcp_servers.supabase]' "$CX_P" 2>/dev/null || printf ',%s,' "$CX_NAMES" | grep -q ',supabase,'; } && CX_CFG=true
-
-# Antigravity
-AG_G="$HOME/.gemini/config/mcp_config.json"; AG_L="$HOME/.gemini/antigravity/mcp_config.json"; AG_W="$REPO_ROOT/.agents/mcp_config.json"
-AG_CFG=false
-{ grep -qF supabase "$AG_G" 2>/dev/null || grep -qF supabase "$AG_L" 2>/dev/null || grep -qF supabase "$AG_W" 2>/dev/null; } && AG_CFG=true
-AG_CLI=""; has agy && AG_CLI="$(command -v agy)"; [ -z "$AG_CLI" ] && has antigravity && AG_CLI="$(command -v antigravity)"
-
-# hello/config.js (key value never printed)
-CFG="$REPO_ROOT/hello/config.js"; URL_FILLED=false; KEY_KIND=empty
-if [ -f "$CFG" ]; then
-  grep -qE 'supabaseUrl[[:space:]]*:[[:space:]]*"https://[^"]+"' "$CFG" && URL_FILLED=true
-  KEY="$(sed -nE 's/.*supabaseKey[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$CFG" | head -n 1)"
-  case "$KEY" in
-    "") KEY_KIND=empty ;;
-    sb_publishable_*) KEY_KIND=publishable ;;
-    sb_secret_*) KEY_KIND=SECRET_DANGER ;;
-    eyJ*) KEY_KIND=legacy_jwt ;;
-    *) KEY_KIND=other ;;
-  esac
-  unset KEY
-fi
-CONFIG_FILLED=false
-if [ "$URL_FILLED" = true ] && { [ "$KEY_KIND" = publishable ] || [ "$KEY_KIND" = legacy_jwt ]; }; then CONFIG_FILLED=true; fi
 
 HINTS=()
 [ -z "$NODE_V" ] && HINTS+=("Node.js missing: macOS 'brew install node' or open https://nodejs.org/ for the user.")
-[ "$WR_STATUS" != logged_in ] && HINTS+=("Cloudflare: run npx -y wrangler login (AGENTS.md step 3).")
-HINTS+=("Supabase MCP configured: opencode=$OC_CFG, codex=$CX_CFG, antigravity=$AG_CFG. Only the platform you are running on matters (AGENTS.md step 2).")
-if [ "$KEY_KIND" = SECRET_DANGER ]; then HINTS+=("DANGER: hello/config.js contains a secret key. Replace with publishable key immediately.")
-elif [ "$CONFIG_FILLED" != true ]; then HINTS+=("hello/config.js not filled yet (AGENTS.md step 6)."); fi
+[ "$WR_STATUS" != logged_in ] && HINTS+=("Cloudflare: AGENTS.md steps 2-3 (npx -y wrangler login --browser=false, open URL in built-in browser).")
+[ "$NAME_CHANGED" != true ] && HINTS+=("hello/wrangler.jsonc name is still CHANGE-ME-hello: set it to <nickname>-hello first (AGENTS.md step 4).")
+if [ "$HAS_D1" != true ]; then HINTS+=("No d1_databases yet: in hello/ run npx -y wrangler d1 create <nickname>-hello-db --binding DB --update-config (AGENTS.md step 4).")
+else HINTS+=("D1 configured; next: migrations apply --remote (step 5), deploy (step 6), verify (step 7)."); fi
 
 HINTS_JSON=""
 for h in "${HINTS[@]}"; do HINTS_JSON="${HINTS_JSON:+$HINTS_JSON,}$(js "$h")"; done
@@ -119,13 +87,13 @@ cat <<JSON
     "antigravity": {"cli": $(b test -n "$AG_CLI"), "path": $(jsn "$AG_CLI")}
   },
   "wrangler": {"status": $(js "$WR_STATUS"), "note": $(js "$WR_NOTE")},
-  "mcp": {
-    "opencode": {"globalConfig": $(file_check "$OC_G" mcp.supabase.com), "projectConfig": $(file_check "$OC_P" mcp.supabase.com), "supabaseLine": $(jsn "$OC_LINE"), "supabaseConfigured": $OC_CFG},
-    "codex": {"globalConfig": $(file_check "$CX_G" '[mcp_servers.supabase]'), "projectConfig": $(file_check "$CX_P" '[mcp_servers.supabase]'), "serverNames": $(jsn "$CX_NAMES"), "supabaseConfigured": $CX_CFG},
-    "antigravity": {"globalConfig": $(file_check "$AG_G" supabase), "globalConfigLegacy": $(file_check "$AG_L" supabase), "workspaceConfig": $(file_check "$AG_W" supabase), "supabaseConfigured": $AG_CFG, "note": "OAuth state is only visible in Antigravity: Settings > Customizations"}
+  "hello": {
+    "wranglerJsonc": $WJ_EXISTS, "name": $(jsn "$NAME"), "nameChanged": $NAME_CHANGED,
+    "hasD1": $HAS_D1, "d1DatabaseName": $(jsn "$D1_NAME"),
+    "workerJs": $(b test -f "$REPO_ROOT/hello/worker.js"),
+    "indexHtml": $(b test -f "$REPO_ROOT/hello/public/index.html"),
+    "migration": $(b test -f "$REPO_ROOT/hello/migrations/0001_connect_check.sql")
   },
-  "hello": {"indexHtml": $(b test -f "$REPO_ROOT/hello/index.html"), "configFilled": $CONFIG_FILLED, "urlFilled": $URL_FILLED, "keyKind": $(js "$KEY_KIND")},
-  "migration": $(b test -f "$REPO_ROOT/supabase/migrations/20261017000000_connect_check.sql"),
   "hints": [$HINTS_JSON]
 }
 JSON
