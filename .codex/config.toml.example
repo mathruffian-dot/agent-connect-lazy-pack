@@ -1,0 +1,11 @@
+# Codex MCP 設定範本（給 Agent 參考，使用者不必手動編輯）
+# 全域：~/.codex/config.toml（ChatGPT 桌面 App 的 Codex、Codex CLI、IDE 擴充共用）
+# 專案層：本資料夾的 .codex/config.toml（只在「受信任專案」生效）
+# 只附加缺少的區塊，不要刪除既有設定。加入後用 `codex mcp login <名稱>` 觸發瀏覽器 OAuth。
+
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp"
+
+# 選配：Cloudflare API MCP（部署網站用 Wrangler，不需要這個）
+# [mcp_servers.cloudflare]
+# url = "https://mcp.cloudflare.com/mcp"

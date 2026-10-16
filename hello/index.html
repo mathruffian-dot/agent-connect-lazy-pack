@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>連接檢查</title>
+  <style>
+    :root {
+      --bg: #f4f6fb; --card: #ffffff; --text: #1d2433; --muted: #5b6475;
+      --ok: #137a3f; --ok-bg: #e5f6ec; --err: #b42318; --err-bg: #fdecea;
+      --accent: #2456d6; --accent-text: #ffffff; --border: #d9deea;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11151d; --card: #1b212c; --text: #e8ecf3; --muted: #9aa4b6;
+        --ok: #6fdc9b; --ok-bg: #173226; --err: #ff8a80; --err-bg: #3a1d1b;
+        --accent: #6c92ff; --accent-text: #0b1020; --border: #2c3442;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--text); padding: 16px;
+      font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    }
+    .card {
+      width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 32px 24px; box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    }
+    h1 { margin: 0 0 20px; font-size: 1.5rem; }
+    .row {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      font-size: 1.6rem; font-weight: 700; padding: 16px 0; border-bottom: 1px solid var(--border);
+    }
+    .row:last-of-type { border-bottom: 0; }
+    button {
+      margin-top: 20px; width: 100%; min-height: 64px; font-size: 1.4rem; font-weight: 700;
+      border: 0; border-radius: 14px; background: var(--accent); color: var(--accent-text); cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    #result { margin-top: 20px; padding: 16px; border-radius: 12px; font-size: 1.15rem; line-height: 1.6; display: none; white-space: pre-line; }
+    #result.ok { display: block; background: var(--ok-bg); color: var(--ok); font-size: 1.6rem; font-weight: 700; text-align: center; }
+    #result.err { display: block; background: var(--err-bg); color: var(--err); }
+    .muted { color: var(--muted); font-size: .95rem; margin-top: 16px; }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1>Agent 連接懶人包・連線檢查</h1>
+    <div class="row"><span>前端：Cloudflare</span><span>✅</span></div>
+    <div class="row"><span>後端：Supabase</span><span id="be">⏳</span></div>
+    <button id="test" type="button">測試 Supabase</button>
+    <div id="result" role="status" aria-live="polite"></div>
+    <p class="muted">按下按鈕會寫入一筆測試資料到 connect_check 資料表，再讀回來比對。</p>
+  </main>
+
+  <script type="module">
+    const cfg = window.HELLO_CONFIG || {};
+    const btn = document.getElementById('test');
+    const out = document.getElementById('result');
+    const be = document.getElementById('be');
+
+    function show(ok, msg) {
+      out.className = ok ? 'ok' : 'err';
+      out.textContent = msg;
+      be.textContent = ok ? '✅' : '❌';
+    }
+
+    function explain(err) {
+      const code = err && err.code ? String(err.code) : '';
+      const msg = err && err.message ? String(err.message) : String(err);
+      if (code === '42P01' || code === 'PGRST205' || /does not exist|schema cache/i.test(msg)) {
+        return '找不到資料表 connect_check。\n建議：請 Agent 重做 AGENTS.md 第 5 步（套用 migration）。';
+      }
+      if (code === '42501' || /row-level security|permission denied/i.test(msg)) {
+        return '權限被拒（RLS）。\n建議：請 Agent 重新套用 supabase/migrations 的 SQL（policy／grant 可能缺漏）。';
+      }
+      if (/Invalid API key|JWT|apikey|No API key/i.test(msg) || code === 'PGRST301') {
+        return '金鑰無效。\n建議：請 Agent 重做第 6 步，用 publishable key 重新填 config.js，再重新部署。';
+      }
+      if (/Failed to fetch|NetworkError|Load failed|fetch/i.test(msg)) {
+        return '無法連到 Supabase。\n建議：專案可能暫停或仍在建立中，請 Agent 檢查專案狀態（第 4 步）；也確認網路沒有擋 supabase.co。';
+      }
+      return '發生錯誤：' + (code ? '[' + code + '] ' : '') + msg + '\n建議：把這段訊息貼給 Agent。';
+    }
+
+    btn.addEventListener('click', async () => {
+      if (!cfg.supabaseUrl || !cfg.supabaseKey) {
+        show(false, '設定未填：config.js 的 supabaseUrl／supabaseKey 是空的。\n建議：請 Agent 做 AGENTS.md 第 6 步，再重新部署（第 7 步）。');
+        return;
+      }
+      if (/^sb_secret_/.test(cfg.supabaseKey)) {
+        show(false, '危險：config.js 填的是 secret key，前端只能用 publishable key。\n請 Agent 立刻改成 publishable key，並到 Supabase 後台重新產生 secret key。');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = '測試中…';
+      try {
+        let createClient;
+        try {
+          ({ createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm'));
+        } catch (e) {
+          show(false, '無法載入 supabase-js 程式庫（cdn.jsdelivr.net）。\n建議：網路可能擋了 CDN，換網路（例如手機熱點）後重新整理再試。');
+          return;
+        }
+        const supabase = createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: false } });
+        const note = 'hello ' + new Date().toISOString();
+
+        const ins = await supabase.from('connect_check').insert({ note }).select('id, note').single();
+        if (ins.error) throw ins.error;
+
+        const sel = await supabase.from('connect_check').select('id, note, created_at').eq('id', ins.data.id).single();
+        if (sel.error) throw sel.error;
+        if (sel.data.note !== note) throw new Error('讀回的資料與寫入的不一致');
+
+        show(true, '✅ 連線成功\n（寫入並讀回第 ' + sel.data.id + ' 筆）');
+      } catch (err) {
+        show(false, explain(err));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '測試 Supabase';
+      }
+    });
+  </script>
+</body>
+</html>

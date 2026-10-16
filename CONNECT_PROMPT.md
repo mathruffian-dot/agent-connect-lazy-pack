@@ -1,15 +1,47 @@
-# CONNECT_PROMPT — 直接全選貼到 OpenCode（Build mode）
+# CONNECT_PROMPT — 對 Agent 說這一句就好
 
-幫我把這台電腦的 Supabase + Cloudflare 一次接完：
+先用你的 Agent（Codex／Antigravity／OpenCode）**開啟這個資料夾**，再在對話框輸入：
 
-1. 先跑 `opencode mcp list` 和 `opencode mcp auth list`，告訴我現在誰連上了、誰沒有。
-2. 缺的幫我在 `opencode.json` 補上（只加缺的，不要刪我原有的）：
-   - supabase：type remote，url https://mcp.supabase.com/mcp
-   - cloudflare：type remote，url https://mcp.cloudflare.com/mcp
-3. 跑 `opencode mcp auth supabase` 和 `opencode mcp auth cloudflare`，瀏覽器跳出來我會按同意。
-4. 如果我根本沒帳號：
-   - Supabase 沒登入 → 給我 https://supabase.com/dashboard/sign-up，帶我用 GitHub 帳號註冊完再重連
-   - Cloudflare 沒登入 → 給我 https://dash.cloudflare.com/sign-up，帶我用 Email 註冊完再重連
-5. 做完用 `opencode mcp auth list` 證明 supabase 和 cloudflare 都是 authenticated。
+```text
+照 AGENTS.md 幫我連接 Supabase 和 Cloudflare
+```
 
-規則：不要叫我貼任何 API Key，全部用瀏覽器 OAuth。缺 CLI（wrangler / firebase / gh / supabase）就提醒我，不要自作主张亂裝。
+Agent 會自己跑所有指令；你只需要註冊、登入、在瀏覽器按同意。
+
+## 中途重開後
+
+Agent 請你重開程式（或開新對話）時，回來說：
+
+```text
+照 AGENTS.md 繼續
+```
+
+已完成的步驟會自動跳過。
+
+## 如果 Agent 沒反應過來（各平台備用說法）
+
+**Codex（ChatGPT 桌面 App／Codex CLI）**
+
+```text
+請讀這個資料夾的 AGENTS.md，你是 codex 平台。從第 0 步開始照做：用 codex mcp add 加入 Supabase MCP、codex mcp login 觸發瀏覽器授權，用 npx wrangler login 連 Cloudflare，所有指令都由你執行。
+```
+
+**Google Antigravity 2**
+
+```text
+請讀這個資料夾的 AGENTS.md，你是 antigravity 平台。從第 0 步開始照做：在 mcp_config.json 用 serverUrl 加入 Supabase MCP，引導我到 Customizations 按 Authenticate，用 npx wrangler login 連 Cloudflare，所有指令都由你執行。
+```
+
+**OpenCode**
+
+```text
+/connect-pack
+```
+
+（或說：「請讀 AGENTS.md，你是 opencode 平台，從第 0 步開始照做，用 opencode mcp auth supabase 觸發授權。」）
+
+## 規則（Agent 已內建，給你安心用）
+
+- 不會叫你貼任何密碼或金鑰，全部用瀏覽器 OAuth 登入。
+- 登入一律在你平常用的瀏覽器，不在 Agent 的內建瀏覽器。
+- 會花錢、會刪東西的動作一定先問你。
