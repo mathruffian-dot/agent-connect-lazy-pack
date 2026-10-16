@@ -38,8 +38,10 @@
 - 專案層 `.codex/config.toml` 只在「受信任專案」生效；不確定就改用全域設定。
 - Codex 沙盒預設可能擋網路或寫入家目錄：Agent 會跳出權限請求，請使用者按允許。
 
-### Codex 內建瀏覽器不能登入／登入後沒反應
-- 內建瀏覽器是獨立設定檔，不共用你平常瀏覽器的登入狀態。本包規定：**登入一律用系統瀏覽器**，內建瀏覽器只做預覽與驗收。
+### 內建瀏覽器不能登入／授權後沒反應
+- 內建瀏覽器是獨立設定檔，不共用你平常瀏覽器的登入狀態，要在裡面重新登入一次。
+- 授權後指令一直沒結束：確認授權網址是由「只印網址」的指令產生（`wrangler login --browser=false`、`codex mcp login … --no-browser`），而且那個指令還在背景等待；逾時就重跑。
+- 仍不行 → 改用系統瀏覽器：拿掉 `--browser=false`／`--no-browser` 重跑，讓它自動開平常的瀏覽器。
 
 ### Antigravity：遠端 OAuth 連不上 Supabase
 - 先確認設定用的是 `serverUrl`（不是 `url`／`httpUrl`），JSON 語法正確，然後重開 Antigravity。
@@ -52,7 +54,7 @@
 - 設定檔位置不確定（`~/.gemini/config/` 與 `~/.gemini/antigravity/` 兩種說法）：可先寫工作區 `.agents/mcp_config.json` 讓本資料夾能用。
 
 ### Antigravity browser agent 卡在 Google 登入
-- Google 常擋自動化瀏覽器。請改在系統瀏覽器登入；browser agent 只用來看公開頁面與驗收網站。
+- Google 常擋自動化瀏覽器。Supabase、Cloudflare 都不需要 Google 登入：改用 GitHub、ChatGPT 或 Email 方式；真的要用 Google 帳號時改在系統瀏覽器登入。
 
 ## Supabase
 
@@ -85,7 +87,7 @@
 - 正式網址以 `wrangler deploy` 輸出最後一行為準，格式 `https://<名稱>.<帳號子網域>.workers.dev`。
 
 ### 部署時說要先設定 workers.dev 子網域（新帳號第一次）
-- Agent 用系統瀏覽器開 https://dash.cloudflare.com/ ，引導使用者：左側「Workers & Pages」→ 依畫面設定 workers.dev 子網域（自取英文名稱，之後所有網站都會用它）→ 回覆「好了」後 Agent 重跑部署。
+- Agent 在內建瀏覽器開 https://dash.cloudflare.com/ （必要時改系統瀏覽器），引導使用者：左側「Workers & Pages」→ 依畫面設定 workers.dev 子網域（自取英文名稱，之後所有網站都會用它）→ 回覆「好了」後 Agent 重跑部署。
 
 ### `wrangler pages project create`／`pages deploy` 失敗
 - Cloudflare Pages 已併入 Workers，新版 Wrangler 會把它轉成 `wrangler deploy` 而失敗。改用：

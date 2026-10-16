@@ -130,7 +130,7 @@ MCP 伺服器：`https://mcp.supabase.com/mcp`（官方遠端 MCP，OAuth 登入
   `mcp-remote` 會自己開系統瀏覽器做 OAuth。Windows 若 `npx` 啟動失敗，改 `"command": "cmd", "args": ["/c", "npx", "-y", "mcp-remote", "https://mcp.supabase.com/mcp"]`。
 
 ### opencode
-- 先確認版本：`opencode --version`。注意桌面版 2.x 自帶的指令程式在 `%LOCALAPPDATA%\Programs\@opencode-aidesktopesources\opencode-cli.exe`，PATH 上的 `opencode` 可能是舊的 1.x（npm 版）；以使用者實際在用的版本為準。
+- 先確認版本：`opencode --version`。注意桌面版 2.x 自帶的指令程式在 `%LOCALAPPDATA%\Programs\@opencode-aidesktop\resources\opencode-cli.exe`，PATH 上的 `opencode` 可能是舊的 1.x（npm 版）；以使用者實際在用的版本為準。
 - **2.x（建議）**：用指令新增，不必手改設定檔格式（v2 的伺服器放在 `mcp.servers` 底下，和 1.x 不同）：
   `opencode mcp add supabase --url https://mcp.supabase.com/mcp --global`
   2.x 的指令需要桌面版的背景服務；請使用者先開著 OpenCode 桌面版。

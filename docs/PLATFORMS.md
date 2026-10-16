@@ -20,7 +20,7 @@
 | 格式 | TOML：`[mcp_servers.supabase]`＋`url = "…"` | JSON：`mcpServers.supabase.serverUrl`（**不支援 `url`、`httpUrl`**） | JSON：`mcp.supabase = { type: "remote", url, enabled }` |
 | 指令新增 | `codex mcp add supabase --url https://mcp.supabase.com/mcp` | 無官方 CLI 指令（改檔或用 App 設定介面） | `opencode mcp add`（互動式；本包改為直接寫設定檔） |
 | App 介面新增 | 設定 → MCP servers → Add server（Streamable HTTP） | 設定 → Customizations → MCP 伺服器管理 | 需實測 |
-| OAuth 觸發 | `codex mcp login supabase`（開系統瀏覽器）；App 內按 Authenticate | 支援 DCR 的伺服器自動；或設定（`Ctrl+,`）→ Customizations → **Authenticate**，必要時把授權碼貼回面板按 Submit | `opencode mcp auth supabase`（開系統瀏覽器）；首次使用時也會自動提示 |
+| OAuth 觸發 | `codex mcp login supabase --no-browser` 印出網址，開在內建瀏覽器；App 內也可按 Authenticate | 支援 DCR 的伺服器自動；或設定（`Ctrl+,`）→ Customizations → **Authenticate**，必要時把授權碼貼回面板按 Submit | 2.x：`opencode mcp add supabase --url … --global` 後 `opencode mcp auth supabase` 或對話中 `/mcps`；1.x：`opencode mcp auth supabase`（會開系統瀏覽器） |
 | 狀態查詢 | `codex mcp list`（`--json` 可機器判讀）；對話中 `/mcp` | App 的 Customizations 頁面 | `opencode mcp list`、`opencode mcp auth list`、`opencode mcp debug supabase` |
 | 登出 | `codex mcp logout supabase` | App 設定中移除／重新驗證 | `opencode mcp logout supabase` |
 | 新設定生效 | 需實測（保守做法：開新對話或重開 App） | 官方建議重開 Antigravity | 重開 OpenCode |
@@ -32,11 +32,11 @@
 |---|---|---|---|
 | 有沒有 | 有（桌面 App；`Ctrl+Shift+B` 切換分割檢視、`Ctrl+T` 開分頁）；Codex CLI、IDE 擴充**沒有** | 有 browser agent | **桌面版 2.x 有**（瀏覽器窗格，Agent 可用 `tools.browser.*` 開分頁、讀頁面）；桌面版 1.x、TUI／CLI **沒有** |
 | 登入狀態 | 獨立設定檔，不共用系統瀏覽器的分頁與登入 | Google 登入常擋自動化瀏覽器 | 2.x 曾有關閉分頁後登入狀態消失的回報 |
-| 本包用途 | 預覽、驗收部署好的網頁 | 2.x 桌面版：預覽、驗收；1.x／TUI：使用者在系統瀏覽器按按鈕回報 |
+| 本包用途 | 註冊、登入、授權、驗收（優先） | 註冊、登入、授權、驗收（優先） | 2.x 桌面版：註冊、登入、授權、驗收（優先）；1.x／TUI：改用系統瀏覽器 |
 
 > OpenCode 桌面版版本：設定 › 關於，或安裝程式名稱。1.x 請到 https://opencode.ai/download 下載新版（目前提供 v2）。
 
-**一律原則**：註冊、登入、OAuth 同意都在系統預設瀏覽器由使用者本人完成；內建瀏覽器只做預覽與驗收。
+**原則**：內建瀏覽器優先（每位學員條件一致），帳號密碼一律由使用者本人輸入；內建瀏覽器擋登入或回呼失敗時改用系統瀏覽器。Cloudflare 用 `wrangler login --browser=false`、Codex 用 `--no-browser` 取得授權網址再開在內建瀏覽器。
 
 ## 共用（與平台無關）
 
