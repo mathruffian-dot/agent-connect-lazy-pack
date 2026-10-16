@@ -37,7 +37,7 @@ Agent 中途請你重開程式時，回來說：`照 AGENTS.md 繼續`。各平�
 
 ## 你只需要做的事
 
-- [ ] 沒有帳號時，在跳出來的網頁註冊 **Supabase**（建議按「Continue with GitHub」）和 **Cloudflare**（Email 註冊，**記得去信箱點驗證信**）
+- [ ] 沒有帳號時，在跳出來的網頁註冊 **Supabase**（可選 GitHub、ChatGPT 或 Email；**沒有 Google 一鍵登入**，想用 Gmail 就走 Email 註冊）和 **Cloudflare**（Email 註冊，**記得去信箱點驗證信**）
 - [ ] 瀏覽器跳出授權頁時：登入 → 選擇組織 → 按 **Authorize／Allow／同意**
 - [ ] Windows 跳出「是否允許此 App 變更您的裝置」時按 **是**（只在需要安裝 Node.js 時出現）
 - [ ] Agent 請求執行指令或連網的權限時按 **允許**

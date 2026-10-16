@@ -80,7 +80,7 @@
 
 MCP 伺服器：`https://mcp.supabase.com/mcp`（官方遠端 MCP，OAuth 登入，不需要任何 Key）。
 
-**2-1 先確認帳號**：問使用者「你有 Supabase 帳號嗎？」沒有 → 系統瀏覽器開 https://supabase.com/dashboard/sign-up ，建議按「Continue with GitHub」（沒有 GitHub 帳號就用 Email 註冊，記得去收驗證信）。等回覆「好了」。
+**2-1 先確認帳號**：問使用者「你有 Supabase 帳號嗎？」沒有 → 系統瀏覽器開 https://supabase.com/dashboard/sign-up ，註冊方式只有 GitHub、ChatGPT、SSO、Email 四種，**沒有 Google 一鍵登入**：有 GitHub 帳號建議按「Continue with GitHub」；用 Codex 的人可按「Continue with ChatGPT」；都沒有就用 Email（可填 Gmail 信箱）＋密碼註冊，記得去收驗證信。等回覆「好了」。
 
 **2-2 依平台寫入設定（已有 supabase 就跳過）**：
 
