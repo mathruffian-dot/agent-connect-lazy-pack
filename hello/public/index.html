@@ -68,29 +68,18 @@
     function explain(status, error) {
       const msg = String(error || '');
       if (/no such table|migrations apply/i.test(msg)) {
-        return '找不到資料表 connect_check（還沒跑 migrations apply）。
-建議：請 Agent 重做 AGENTS.md 第 5 步，不必重新部署。
-
-原始訊息：' + msg;
+        return '找不到資料表 connect_check（還沒跑 migrations apply）。\n建議：請 Agent 重做 AGENTS.md 第 5 步，不必重新部署。\n\n原始訊息：' + msg;
       }
       if (/綁定 DB|d1_databases|binding/i.test(msg)) {
-        return '網站還沒接上 D1 資料庫。
-建議：請 Agent 重做 AGENTS.md 第 4 步（d1 create），再重新部署（第 6 步）。
-
-原始訊息：' + msg;
+        return '網站還沒接上 D1 資料庫。\n建議：請 Agent 重做 AGENTS.md 第 4 步（d1 create），再重新部署（第 6 步）。\n\n原始訊息：' + msg;
       }
       if (status === 404) {
-        return '找不到 /api/check（網站只部署了網頁，Worker 沒有生效）。
-建議：請 Agent 在 hello 資料夾內重新執行 npx -y wrangler deploy（第 6 步）。';
+        return '找不到 /api/check（網站只部署了網頁，Worker 沒有生效）。\n建議：請 Agent 在 hello 資料夾內重新執行 npx -y wrangler deploy（第 6 步）。';
       }
       if (status === 429 || /limit|quota|exceeded/i.test(msg)) {
-        return '超過 Cloudflare 免費額度。
-建議：免費額度每天 UTC 0 點（台灣早上 8 點）重置，稍後再試。
-
-原始訊息：' + msg;
+        return '超過 Cloudflare 免費額度。\n建議：免費額度每天 UTC 0 點（台灣早上 8 點）重置，稍後再試。\n\n原始訊息：' + msg;
       }
-      return '發生錯誤' + (status ? '（HTTP ' + status + '）' : '') + '：' + (msg || '未知錯誤') + '
-建議：把這段訊息貼給 Agent。';
+      return '發生錯誤' + (status ? '（HTTP ' + status + '）' : '') + '：' + (msg || '未知錯誤') + '\n建議：把這段訊息貼給 Agent。';
     }
 
     btn.addEventListener('click', async () => {
@@ -101,15 +90,13 @@
         try {
           res = await fetch('/api/check', { method: 'POST' });
         } catch (e) {
-          show(false, '無法連到網站的 /api/check。
-建議：確認網路正常（可改用手機熱點），重新整理再試。');
+          show(false, '無法連到網站的 /api/check。\n建議：確認網路正常（可改用手機熱點），重新整理再試。');
           return;
         }
         let data = null;
         try { data = await res.json(); } catch (e) { data = null; }
         if (res.ok && data && data.ok) {
-          show(true, '✅ 連線成功
-（寫入並讀回第 ' + data.count + ' 筆）');
+          show(true, '✅ 連線成功\n（寫入並讀回第 ' + data.count + ' 筆）');
         } else {
           show(false, explain(res.status, data && data.error));
         }
