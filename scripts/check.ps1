@@ -125,7 +125,13 @@ $result.hello = $hello
 $hints = @()
 if (-not $result.node.ok) { $hints += 'Node.js missing: winget install -e --id OpenJS.NodeJS.LTS (user approves UAC), then refresh PATH.' }
 if ($wr.status -ne 'logged_in') { $hints += 'Cloudflare: AGENTS.md steps 2-3 (npx -y wrangler login --browser=false, open URL in built-in browser).' }
-if (-not $hello.nameChanged) { $hints += 'hello/wrangler.jsonc name is still CHANGE-ME-hello: set it to <nickname>-hello first (AGENTS.md step 4).' }
+if (-not $hello.nameChanged) {
+  $hints += 'Nickname not chosen yet: if hello/wrangler.jsonc name is still CHANGE-ME-hello, generate it once with scripts/new-nickname.ps1 (AGENTS.md step 3.5), then set name to <nickname>-hello (step 4). If name is already set, reuse that nickname and do NOT rerun new-nickname.'
+}
+else {
+  $nickname = $hello.name -replace '-hello$',''
+  $hints += "Nickname already chosen: '$nickname'. Reuse it for every later step; never rerun new-nickname (it would generate different digits)."
+}
 if (-not $hello.hasD1) { $hints += 'No d1_databases yet: in hello/ run npx -y wrangler d1 create <nickname>-hello-db --binding DB --update-config (AGENTS.md step 4).' }
 else { $hints += 'D1 configured; next: migrations apply --remote (step 5), deploy (step 6), verify (step 7).' }
 $result.hints = $hints

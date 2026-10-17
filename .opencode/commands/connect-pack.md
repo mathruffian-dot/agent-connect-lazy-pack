@@ -6,6 +6,7 @@ description: 照 AGENTS.md 連接 Cloudflare（Workers＋D1），並部署 hello
 
 重點提醒：
 - 所有指令由你執行，使用者只負責註冊 Cloudflare、在瀏覽器按 Allow。
+- 不需要問使用者要暱稱：授權完成後執行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-nickname.ps1` 自動產生（AGENTS.md 第 3.5 步），輸出 JSON 的 `nickname` 欄位就是 `<暱稱>`。**只產生一次並沿用**，之後每步都用同一個。
 - 不需要任何 MCP 或金鑰：背景執行 `npx -y wrangler login --browser=false`，把印出的授權網址用 `tools.browser.tabs.open` 開在桌面版 2.x 的瀏覽器窗格；沒有瀏覽器窗格（1.x／TUI）就去掉 `--browser=false`。
 - 在 `hello/` 內：改 `wrangler.jsonc` 的 name → `npx -y wrangler d1 create <暱稱>-hello-db --binding DB --update-config` → `npx -y wrangler d1 migrations apply <暱稱>-hello-db --remote` → `npx -y wrangler deploy`。
 - 絕不要求使用者貼任何金鑰或密碼，絕不讀取 token 檔。

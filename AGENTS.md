@@ -42,7 +42,11 @@
 
 ## 可續跑（重要）
 
-本程序設計成可以重跑：每次開始都先做第 1 步檢查，**已完成的步驟直接跳過**（已登入、`wrangler.jsonc` 已有 `d1_databases`、資料表已存在都會被偵測到）。若安裝 Node.js 後 Agent 必須重開，告訴使用者：
+本程序設計成可以重跑：每次開始都先做第 1 步檢查，**已完成的步驟直接跳過**（已登入、`wrangler.jsonc` 已有 `d1_databases`、資料表已存在都會被偵測到）。
+
+**重跑時的暱稱**：第 3.5 步產生的 `<暱稱>` **只產生一次並沿用**。重跑整個程序時，先讀 `hello/wrangler.jsonc` 的 `name` 欄位：`name` 已經不是 `CHANGE-ME-hello`（例如 `rwsung180-452759-hello`）時，`<暱稱>` 就是 `-hello` 前面的部分，**絕對不要重新跑 `new-nickname.*`**，否則 Worker 與 D1 的名稱會對不起來。
+
+若安裝 Node.js 後 Agent 必須重開，告訴使用者：
 
 > 「已安裝好。請關掉並重新開啟〈平台名稱〉（或開一個新對話），再對我說：『照 AGENTS.md 繼續』。」
 
@@ -59,14 +63,20 @@
 | OpenCode（桌面版 2.x；1.x／TUI 沒有內建瀏覽器） | `opencode` |
 | 其他（Claude Code、Gemini CLI 等） | `other`，用系統瀏覽器 |
 
-然後**問一次**英文暱稱（只用小寫英文 a-z、數字 0-9、連字號 `-`，開頭是英文字母，例如 `wang`、`teacher-lin`；有大寫就幫他轉小寫），之後：
+然後**不要問使用者要暱稱**。暱稱會在第 3 步授權完成後，由 `scripts/new-nickname.*` 從他的 Cloudflare 帳號 Email 自動產生（見第 3.5 步）。
 
-- Worker（網站）名稱：`<暱稱>-hello`
-- D1 資料庫名稱：`<暱稱>-hello-db`
+**為什麼不手動取名**：Cloudflare 的 **workers.dev 子網域是全雲端搶先註冊制**，不是只有你自己帳號內唯一。所有老師都取 `wang`、`hello`、`test` 這種簡稱時，先部署的人會佔走名字，後面的人就會看到：
+
+```
+ERROR  Wrangler could not automatically register "hello" as your workers.dev
+       subdomain because the name is unavailable.
+```
+
+加上隨機數字尾碼（`<gmail 名稱>-<6 位數字>`）之後，撞名機率可以忽略。使用者完全不用想名字，也不用記名字。
 
 開場白範例（照實調整）：
 
-> 「我是 Codex，接下來由我跑所有指令。你只需要做 3 種事：① 沒帳號時註冊 Cloudflare（Email＋密碼，記得收驗證信）② 瀏覽器出現授權頁時按 Allow ③ 我請你按『允許』時按允許。大約 10 分鐘。先告訴我一個英文暱稱。」
+> 「我是 Codex，接下來由我跑所有指令。你只需要做 3 種事：① 沒帳號時註冊 Cloudflare（Email＋密碼，記得收驗證信）② 瀏覽器出現授權頁時按 Allow ③ 我請你按『允許』時按允許。大約 10 分鐘。網站名稱我會用你的 Email 自動產生，你不用自己想。」
 
 ## 第 1 步：環境檢查（Agent 自己跑）
 
@@ -113,6 +123,35 @@
 - Codex 沙盒擋網路 → 請使用者在權限提示按允許。
 - 詳見 `docs/TROUBLESHOOTING.md`。
 
+## 第 3.5 步：自動產生暱稱（不要跳過）
+
+授權成功後，**立刻**執行下面這行，把 `nickname` 欄位記為 `<暱稱>`，之後第 4～8 步都用它：
+
+- Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-nickname.ps1`
+- macOS／Linux：`bash scripts/new-nickname.sh`
+
+這支腳本會自己呼叫 `npx -y wrangler whoami` 抓 Email，取 `@` 前面的部分、轉小寫、去掉 `.` `+` `_` 等不合法字元，再加 6 位隨機數字，輸出：
+
+```json
+{"nickname":"rwsung180-452759","subdomain":"rwsung180-452759","worker":"rwsung180-452759-hello","d1":"rwsung180-452759-hello-db"}
+```
+
+接著：
+
+- **只產生一次，然後記住它。** 後續每個步驟都用同一個 `<暱稱>`，不要重新跑（重新跑會得到不同數字，Worker 和 D1 名稱就對不上了）。
+- 告訴使用者一行：「✅ 你的網站名稱是 `<暱稱>-hello`，網址會是 `https://<暱稱>-hello.<暱稱>.workers.dev`。」
+- 如果使用者主動想要某個特定名稱（例如教研活動共用的名字），改用 `-Seed <basename>`：
+  - Windows：`... -File scripts\new-nickname.ps1 -Seed teacher-lin`
+  - macOS／Linux：`bash scripts/new-nickname.sh -s teacher-lin`
+  - **注意：`-Seed` 一樣會加隨機數字尾碼**，不要直接拿未加工的字串去當名稱。
+- 想確認某個名稱合不合法（只有小寫英文／數字／連字號、開頭是英文字母、≤63 字元）時：
+  - Windows：`... -File scripts\new-nickname.ps1 -Check abc-1234`
+  - macOS／Linux：`bash scripts/new-nickname.sh -c abc-1234`
+
+**若失敗**：
+- 腳本報「Could not read an email address」→ 代表還沒登入成功，回第 3 步。
+- 產生的暱稱在第 6 步部署時又報子網域被占用 → 機率極低（約萬分之一），**重跑一次第 3.5 步**換一組數字，並記得同步更新 `wrangler.jsonc` 的 `name`。
+
 ## 第 4 步：設定網站名稱＋建立 D1 資料庫
 
 以下指令都在 **`hello/` 資料夾內**執行（工作目錄設為 `hello`）。
@@ -125,14 +164,15 @@
    npx -y wrangler d1 create <暱稱>-hello-db --binding DB --update-config
    ```
    成功後 `wrangler.jsonc` 會多出 `d1_databases`（binding `DB`、database_name、database_id）。若非互動環境詢問是否寫入設定，依 `npx wrangler d1 create --help` 選擇同意的參數；仍沒寫入就照第 4 點手動加。
-4. **名稱已存在**（錯誤訊息含 already exists）→ 問使用者：「你的帳號裡已經有 `<暱稱>-hello-db`，要沿用它嗎？（沿用只會多一張測試表）」
-   - 沿用 → `npx -y wrangler d1 list` 找到該名稱的 `uuid`（database_id），在 `wrangler.jsonc` 手動加入：
+4. **名稱已存在**（錯誤訊息含 already exists）→ 這代表這個帳號裡已經有同名的資料庫，通常是使用者先前跑過一次。因為 `<暱稱>` 已經帶隨機數字，這種情況只會發生在「同一個 Email 又跑一次」而且撞到同一組數字時，機率很低。照下面處理：
+   - **預設做法：換一組數字重跑第 3.5 步**，然後同步把 `wrangler.jsonc` 的 `name` 和 D1 名稱一起換成新的。乾淨、不會動到舊資料。
+   - 想沿用舊的也可以問使用者：「你的帳號裡已經有 `<暱稱>-hello-db`，要沿用嗎？（沿用只會多一張測試表）」。沿用時用 `npx -y wrangler d1 list` 找到該名稱的 `uuid`（database_id），在 `wrangler.jsonc` 手動加入：
      ```jsonc
      "d1_databases": [
        { "binding": "DB", "database_name": "<暱稱>-hello-db", "database_id": "<uuid>" }
      ]
      ```
-   - 不沿用 → 改用 `<暱稱>-hello2-db` 重新建立（Worker 名稱可維持不變）。
+   - **不要**刪除使用者既有的資料庫。刪除資料庫是不可逆操作，必須先問過使用者並得到明確同意。
 
 **若失敗**：未登入 → 回第 3 步；帳號未驗證 Email → 請使用者去信箱點驗證信後重試。
 
@@ -159,16 +199,19 @@ npx -y wrangler deploy
 ```
 
 - 會依 `wrangler.jsonc` 部署 `worker.js`（`/api/*`）與 `public/` 靜態網頁，並綁定 D1。同名 Worker 再部署一次就是更新。
-- 若使用者說帳號裡已有同名但不是本包建立的 Worker，先問他，或改名（例如 `<暱稱>-hello2`）。
-- 指令輸出**會印出正式網址**，格式 `https://<暱稱>-hello.<帳號子網域>.workers.dev`。以實際輸出為準，記下來。
+- **自動設定子網域**：新帳號第一次部署時，Wrangler 會拿 `<暱稱>` 去註冊 workers.dev 子網域。因為 `<暱稱>` 已經是「Email 名稱＋隨機數字」，通常會直接成功，你**不需要**去後台設定。
+- 若使用者說帳號裡已有同名但不是本包建立的 Worker，先問他，或換一組數字重跑第 3.5 步。
+- 指令輸出**會印出正式網址**，格式 `https://<暱稱>-hello.<暱稱>.workers.dev`。以實際輸出為準，記下來。
 
 > Cloudflare Pages 已併入 Workers。**不要用** `wrangler pages …` 指令。
 
 **若失敗**：
 - `Authentication error`／未登入 → 回第 3 步。
 - 帳號未驗證 Email → 請使用者去信箱點驗證信後重試。
-- 提示需要 **workers.dev 子網域**（新帳號第一次部署常見）→ 在內建瀏覽器開 https://dash.cloudflare.com/ ，引導使用者：左側「Workers & Pages」（或 Compute › Workers & Pages）→ 依畫面設定 workers.dev 子網域（自取一個英文名稱）→ 完成後說「好了」，再重跑部署。
-- 名稱不合法 → 改成只含 a-z、0-9、`-` 的名稱。
+- **子網域已被占用**（錯誤含 `could not automatically register` 或 `name is unavailable`）→ 這是最常見的失敗點。照順序處理：
+  1. **先換一組數字重跑第 3.5 步**，把新的 `<暱稱>` 同步寫進 `wrangler.jsonc` 的 `name`，再重跑部署。成功率幾乎 100%。
+  2. 若使用者堅持要用某個特定子網域名稱，在內建瀏覽器開 `https://dash.cloudflare.com/` 引導他：左側「Workers & Pages」→ 設定 workers.dev 子網域 → 完成後說「好了」，再重跑部署。
+- 名稱不合法 → 執行 `scripts/new-nickname.* -Check <名稱>` 檢查，再用腳本產生合法名稱。
 - 網址剛部署完打不開 → 新子網域可能要 1～2 分鐘生效，稍後再試。
 
 ## 第 7 步：端到端驗收（看到「✅ 連線成功」才算完成）

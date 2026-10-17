@@ -39,20 +39,35 @@ Agent 中途請你重開程式時，回來說：`照 AGENTS.md 繼續`。各平�
 
 - [ ] **註冊 Cloudflare**：沒有帳號時，在 Agent 打開的網頁輸入 Email＋自訂密碼，**記得去信箱點驗證信**
 - [ ] **在內建瀏覽器按 Allow**：Agent 打開 Cloudflare 授權頁時，登入後按 **Allow**（只要一次）
-- [ ] 告訴 Agent 一個英文暱稱（例如 `wang`），網站會叫 `wang-hello`
 - [ ] Windows 跳出「是否允許此 App 變更您的裝置」時按 **是**（只在需要安裝 Node.js 時出現）
 - [ ] Agent 請求執行指令或連網的權限時按 **允許**
-- [ ] Cloudflare 新帳號第一次部署時，Agent 可能請你在 Cloudflare 後台設定一個 workers.dev 子網域（自取英文名稱）
+- [ ] **不用自己想網站名稱**，Agent 會用你的 Email 自動產生（見下方「名稱怎麼來的」）
+
+## 名稱怎麼來的（不用自己想）
+
+Cloudflare 的 **workers.dev 子網域是全雲端搶先註冊制**，不是只有你自己帳號內唯一。如果所有老師都取 `wang`、`hello` 這種簡稱，先部署的人會佔走名字，後面的人部署時就會看到 `the name is unavailable` 而失敗。
+
+所以這個包**不再問你暱稱**。Agent 在授權完成後，會執行 `scripts/new-nickname.*`，用你 Gmail 的名稱加上 6 位隨機數字自動產生：
+
+| 你的 Gmail | 產生的暱稱 | 網站名稱 | 網址 |
+| --- | --- | --- | --- |
+| `rwsung180@gmail.com` | `rwsung180-452759` | `rwsung180-452759-hello` | `https://rwsung180-452759-hello.rwsung180-452759.workers.dev` |
+| `john.doe.hr@gmail.com` | `johndoehr-305814` | `johndoehr-305814-hello` | `https://johndoehr-305814-hello.johndoehr-305814.workers.dev` |
+
+（尾碼每次執行都不同，是隨機的。）
+
+想自己指定名稱也可以，跟 Agent 說「我的網站名稱要用 `teacher-lin` 開頭」就好，Agent 會用 `-Seed` 參數，仍然會自動補上隨機數字避免撞名。
 
 ## Agent 會幫你做的事
 
 1. 檢查電腦環境，缺 Node.js 就幫你安裝
 2. 打開 Cloudflare 註冊頁（沒帳號時）與授權頁
-3. 建立一個 D1 資料庫 `<暱稱>-hello-db`
-4. 建立一張測試資料表 `connect_check`
-5. 把測試網站部署到 Cloudflare（網址 `https://<暱稱>-hello.<你的子網域>.workers.dev`）
-6. 打開網頁按「測試資料庫」，確認「✅ 連線成功」
-7. 給你一張「連接完成卡」（平台、網址、資料庫名稱）
+3. 用你的 Email 自動產生唯一暱稱（`<gmail 名稱>-<隨機數字>`）
+4. 建立一個 D1 資料庫 `<暱稱>-hello-db`
+5. 建立一張測試資料表 `connect_check`
+6. 把測試網站部署到 Cloudflare（網址 `https://<暱稱>-hello.<暱稱>.workers.dev`）
+7. 打開網頁按「測試資料庫」，確認「✅ 連線成功」
+8. 給你一張「連接完成卡」（平台、網址、資料庫名稱）
 
 ## 瀏覽器原則
 
@@ -76,6 +91,7 @@ Agent 中途請你重開程式時，回來說：`照 AGENTS.md 繼續`。各平�
 | `CLAUDE.md`、`GEMINI.md` | 一行導向 `AGENTS.md`（給其他 Agent） |
 | `CONNECT_PROMPT.md` | 要說的那一句話＋各平台備用說法 |
 | `scripts/check.ps1`、`scripts/check.sh` | Agent 執行的唯讀環境檢查（不安裝、不碰秘密） |
+| `scripts/new-nickname.ps1`、`scripts/new-nickname.sh` | 從帳號 Email 產生唯一暱稱（`名稱-隨機數字`），並可檢查名稱合法性 |
 | `.opencode/commands/connect-pack.md` | OpenCode 的 `/connect-pack` 指令 |
 | `hello/wrangler.jsonc` | 網站設定（Agent 會改名並自動加入 D1 資料庫） |
 | `hello/worker.js` | 後端：`/api/check` 寫入並讀回 D1 |

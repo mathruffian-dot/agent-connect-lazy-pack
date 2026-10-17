@@ -56,15 +56,28 @@
 - 仍沒收到：在 Cloudflare 後台上方的提示列可重寄驗證信。
 
 ### 部署時說要先設定 workers.dev 子網域（新帳號第一次）
-- Agent 在內建瀏覽器開 https://dash.cloudflare.com/ （必要時改系統瀏覽器），引導使用者：左側「Workers & Pages」（或 Compute › Workers & Pages）→ 依畫面設定 workers.dev 子網域（自取英文名稱，之後所有網站都會用它）→ 回覆「好了」後 Agent 重跑 `npx -y wrangler deploy`。
+- 新帳號第一次部署時 Wrangler 會提示要註冊子網域。**正常情況下不用手動設定**：`scripts/new-nickname.*` 產生的 `<暱稱>` 已經是「Email 名稱＋6 位隨機數字」，Wrangler 會自動拿它去註冊，通常直接就成功。
+- 只有在自動註冊失敗時才需要手動處理（見下一題）。
+
+### 子網域已被別人占用（`the name is unavailable` / `could not automatically register`）
+- **這是最常見的失敗點。** workers.dev 子網域是**全 Cloudflare 全球搶先註冊**的，不是只有你自己帳號內唯一，所以兩位不同老師都填 `hello` 就會互相搶。
+- Agent 的處理順序：
+  1. **換一組數字重跑第 3.5 步**（Windows：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-nickname.ps1`；macOS／Linux：`bash scripts/new-nickname.sh`），把新的 `<暱稱>` 同步寫進 `hello/wrangler.jsonc` 的 `name`，再重跑部署。成功率幾乎 100%。
+  2. 使用者堅持要特定名稱時，才在內建瀏覽器開 https://dash.cloudflare.com/ 引導手動設定：左側「Workers & Pages」→ 設定 workers.dev 子網域 → 回覆「好了」後重跑 `npx -y wrangler deploy`。
+- 想確認某個名稱合不合法，用 `scripts/new-nickname.* -Check <名稱>`（合法規則：只能小寫 a-z、0-9、連字號，開頭是英文字母，≤63 字元）。
 
 ### `wrangler.jsonc` 的 name 錯誤（`CHANGE-ME-hello`）
 - 含大寫的預設名稱會被 Wrangler 拒絕，這是防呆：Agent 要先把 name 改成 `<暱稱>-hello`（只能小寫 a-z、0-9、連字號）。
 
+### 重跑整個程序時，暱稱跑掉了
+- 第 3.5 步的 `<暱稱>` **只能產生一次**。重跑時先讀 `hello/wrangler.jsonc` 的 `name`：若已經不是 `CHANGE-ME-hello`（例如 `rwsung180-452759-hello`），`<暱稱>` 就是 `-hello` 前面的部分，直接沿用。
+- 若不小心重新跑了 `new-nickname.*`，Worker 與 D1 的名稱會對不起來 → 用 `npx -y wrangler deploy` 部署到錯誤的名稱，資料庫則會另外建立。照上面第 1 點重新處理即可。
+
 ### D1 名稱重複（already exists）
-- 帳號裡已有同名資料庫（例如之前跑過一次）。Agent 先問使用者要不要沿用：
-  - 沿用：`npx -y wrangler d1 list` 找到該名稱的 id，手動加進 `hello/wrangler.jsonc` 的 `d1_databases`（binding `DB`）。
-  - 不沿用：改名（例如 `<暱稱>-hello2-db`）重新建立。
+- 帳號裡已有同名資料庫。因為 `<暱稱>` 已帶隨機數字，這通常代表同一個 Email 跑過兩次而且撞到同一組數字，機率很低。
+- 預設做法：換一組數字重跑第 3.5 步，同步更新 `wrangler.jsonc` 的 `name`，重新建立資料庫。
+- 想沿用舊的也可以：`npx -y wrangler d1 list` 找到該名稱的 id，手動加進 `hello/wrangler.jsonc` 的 `d1_databases`（binding `DB`）。
+- **不要**刪除使用者既有的資料庫，除非使用者明確同意。
 
 ### 測試網頁顯示「找不到資料表」（忘記 migrations）
 - 代表雲端資料庫還沒建立 `connect_check`。Agent 在 `hello/` 內執行：
